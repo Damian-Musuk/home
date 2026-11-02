@@ -14,6 +14,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "chordpro:merge": "node scripts/merge-chordpro-lrc.mjs",
     "deploy": "npm run build && wrangler deploy",
     "lint": "eslint .",
     "preview": "vite preview"

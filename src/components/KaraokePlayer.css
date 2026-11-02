@@ -2,7 +2,7 @@
 .karaoke-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 0 10px 20px; }
 .karaoke-heading h2 { margin: 4px 0; color: var(--text-h); font-size: clamp(1.7rem, 4vw, 2.5rem); }
 .karaoke-subtitle { margin: 0; color: var(--text); }
-.karaoke-badge { flex: none; padding: 7px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--accent); font-size: .68rem; font-weight: 700; letter-spacing: .1em; }
+.karaoke-count { flex: none; margin: 0 8px 0 0; color: grey; font-size: .85rem; font-weight: 400; white-space: nowrap; }
 .karaoke-stage { height: min(55vh, 520px); min-height: 300px; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--accent-bg); }
 .karaoke-lyrics { display: flex; height: 100%; overflow-y: auto; flex-direction: column; justify-content: flex-start; gap: 7px; padding: 28px clamp(18px, 7vw, 72px); scroll-behavior: smooth; }
 .karaoke-lyric-tail { flex: none; height: clamp(3.2rem, 8vw, 5rem); }
@@ -10,6 +10,14 @@
 .karaoke-line:hover { opacity: .8; }
 .karaoke-line.is-past { opacity: .65; }
 .karaoke-line.is-active { color: var(--accent-color, #d76b39); opacity: 1; transform: scale(1.025); }
+.karaoke-line.is-section { display: flex; align-items: center; gap: 14px; margin: 9px 0 1px; padding: 8px 0; color: var(--text); font-size: clamp(.78rem, 1.8vw, 1rem); font-weight: 800; letter-spacing: .12em; line-height: 1.2; text-align: center; text-transform: uppercase; opacity: .72; }
+.karaoke-line.is-section::before, .karaoke-line.is-section::after { height: 1px; flex: 1; background: var(--border); content: ''; }
+.karaoke-line.is-section.is-active { color: var(--accent-color, #d76b39); opacity: 1; transform: none; }
+.karaoke-line.is-section.is-active::before, .karaoke-line.is-section.is-active::after { background: var(--accent-color, #d76b39); }
+.karaoke-line.is-section.is-past { opacity: .5; }
+.karaoke-line.has-chords { margin-top: .2em; padding-top: 1.75em; white-space: pre-wrap; }
+.karaoke-inline-chord { position: relative; display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+.karaoke-inline-chord > span { position: absolute; z-index: 2; bottom: 100%; left: 0; width: max-content; transform: translateY(-.8em); padding: 2px 6px; border: 1px solid #a6a6a6; border-radius: 6px; color: #273fce; background: #dedede; font-size: .62em; font-weight: 800; letter-spacing: normal; line-height: 1.25; white-space: nowrap; pointer-events: none; }
 .karaoke-line:focus-visible, .karaoke-play:focus-visible, .karaoke-skip:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .karaoke-status { display: grid; height: 100%; place-items: center; padding: 24px; color: var(--text); text-align: center; }
 .karaoke-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 28px; padding: 18px 8px 4px; }
@@ -45,13 +53,6 @@
 .karaoke-sections button { flex: none; padding: 6px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-h); background: var(--bg); font: inherit; font-size: .75rem; cursor: pointer; transition: color 140ms ease, background 140ms ease, border-color 140ms ease; }
 .karaoke-sections button:hover { border-color: var(--accent-color, #d76b39); color: var(--accent-color, #d76b39); }
 .karaoke-sections button.is-active { border-color: var(--accent-color, #d76b39); color: #fff; background: var(--accent-color, #d76b39); }
-.karaoke-chords { min-width: 0; margin: 14px 8px 0; padding: 10px 12px 5px; border: 1px solid var(--border); border-radius: 12px; }
-.karaoke-chords legend { padding: 0 6px; color: var(--text-h); font-size: .82rem; font-weight: 700; }
-.karaoke-chord-track { display: flex; min-width: 0; gap: 7px; overflow-x: auto; padding: 3px 2px 9px; scroll-behavior: smooth; scrollbar-width: thin; }
-.karaoke-chord { flex: none; min-width: 48px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-h); background: var(--bg); font: inherit; font-size: .9rem; font-weight: 700; text-align: center; scroll-snap-align: center; cursor: pointer; }
-.karaoke-chord { position: relative; z-index: 0; transition: transform 160ms ease, font-size 160ms ease; }
-.karaoke-chord.is-active { z-index: 2; transform: scale(1.17); font-size: 1.08rem; font-weight: 850; }
-.karaoke-chord.is-nearby { z-index: 1; transform: scale(1.07); font-size: .98rem; font-weight: 750; }
 .karaoke-beats { min-width: 0; margin: 8px 8px 0; padding: 10px 12px 12px; border: 1px solid var(--border); border-radius: 12px; }
 .karaoke-beats legend { padding: 0 6px; color: var(--text-h); font-size: .82rem; font-weight: 700; }
 .karaoke-beats legend span { margin-left: 8px; color: var(--text); font-size: .7rem; font-weight: 500; opacity: .75; }
@@ -61,7 +62,17 @@
 .karaoke-beat.is-active:not(.is-subbeat) { font-size: 1rem; font-weight: 850; }
 .karaoke-page { padding-bottom: 120px; }
 .karaoke-controls { position: fixed; z-index: 8; left: 50%; bottom: calc(64px + max(12px, env(safe-area-inset-bottom))); width: min(700px, calc(100% - 32px)); box-sizing: border-box; padding: 10px 14px; border: 1px solid var(--text-h); border-radius: 14px; background: crimson; box-shadow: 0 16px 50px rgba(0, 0, 0, .28); transform: translateX(-50%); }
+.karaoke-controls.has-cover { grid-template-columns: auto auto minmax(0, 1fr); gap: 14px; }
+.karaoke-cover-trigger { display: block; width: 56px; height: 56px; align-self: center; padding: 0; border: 0; border-radius: 9px; background: transparent; cursor: zoom-in; }
+.karaoke-cover { display: block; width: 56px; height: 56px; align-self: center; border-radius: 9px; object-fit: cover; }
+.karaoke-cover-trigger:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.karaoke-cover-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .78); }
+.karaoke-cover-dialog { position: relative; display: grid; max-width: min(92vw, 900px); max-height: 90dvh; place-items: center; }
+.karaoke-cover-dialog > img { display: block; max-width: 100%; max-height: 90dvh; border-radius: 12px; object-fit: contain; box-shadow: 0 20px 70px rgba(0, 0, 0, .5); }
+.karaoke-cover-close { position: absolute; z-index: 1; top: 10px; right: 10px; display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 50%; color: #222; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, .32); cursor: pointer; }
+.karaoke-cover-close svg { width: 24px; height: 24px; }
+.karaoke-cover-close:focus-visible { outline: 3px solid var(--accent-color, #d76b39); outline-offset: 3px; }
 .karaoke-transport .karaoke-skip { color: #fff; }
 .karaoke-timeline { color: #fff; }
 .karaoke-play { color: #fff; background: var(--accent); }
-@media (max-width: 600px) { .karaoke-page { padding-bottom: 150px; } .karaoke-heading { align-items: flex-start; } .karaoke-badge { margin-top: 7px; font-size: .58rem; } .karaoke-stage { min-height: 210px; height: 36vh; } .karaoke-controls { bottom: calc(64px + max(8px, env(safe-area-inset-bottom))); grid-template-columns: 1fr; justify-items: center; gap: 8px; width: calc(100% - 24px); padding: 8px 12px; } .karaoke-timeline { width: 100%; } .karaoke-stems { margin-bottom: 10px; padding: 9px 10px; } .karaoke-sections { margin: 8px 8px 10px; padding: 8px 9px 8px; } .karaoke-chords, .karaoke-beats { margin-top: 7px; padding: 8px 9px 10px; } }
+@media (max-width: 600px) { .karaoke-page { padding-bottom: 150px; } .karaoke-heading { align-items: flex-start; } .karaoke-stage { min-height: 210px; height: 36vh; } .karaoke-controls { bottom: calc(64px + max(8px, env(safe-area-inset-bottom))); grid-template-columns: 1fr; justify-items: center; gap: 8px; width: calc(100% - 24px); padding: 8px 12px; } .karaoke-controls.has-cover { grid-template-columns: auto minmax(0, 1fr); gap: 8px; } .karaoke-controls.has-cover .karaoke-timeline { grid-column: 1 / -1; } .karaoke-cover-trigger, .karaoke-cover { width: 48px; height: 48px; } .karaoke-cover-backdrop { padding: 14px; } .karaoke-cover-dialog, .karaoke-cover-dialog > img { max-width: 96vw; max-height: 86dvh; } .karaoke-timeline { width: 100%; } .karaoke-stems { margin-bottom: 10px; padding: 9px 10px; } .karaoke-sections { margin: 8px 8px 10px; padding: 8px 9px 8px; } .karaoke-beats { margin-top: 7px; padding: 8px 9px 10px; } }

@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AudioLines, Drum, Guitar, Mic2, Pause, Play, RefreshCw, RotateCcw, RotateCw, type LucideIcon } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { AudioLines, Drum, Guitar, Mic2, Pause, Play, RefreshCw, RotateCcw, RotateCw, X, type LucideIcon } from 'lucide-react'
 import './KaraokePlayer.css'
 
-type LyricLine = { time: number; text: string; section?: boolean }
-type ChordPhrase = { section: string; lyric: string; chords: string[] }
-type ChordEvent = { time: number; chord: string; section: string; id: string }
+type LyricSegment = { text: string; chord?: string }
+type LyricLine = { time: number; text: string; section?: boolean; segments?: LyricSegment[] }
 type StemTrack = { id: string; label: string; src: string; icon: LucideIcon }
 type StemCandidate = Omit<StemTrack, 'src'> & { sources: string[] }
-type KaraokeSong = { id: string; title: string; audio: string; lyrics: string; chords: string; stems: StemCandidate[] }
+type KaraokeSong = { id: string; title: string; audio: string; lyrics: string; image?: string; stems: StemCandidate[] }
 
 const stemTypes = [
   { id: 'vocal', suffixes: ['vocal.ogg', 'vocals.ogg', 'vocals.mp3'], label: 'Vocals', icon: Mic2 },
@@ -34,7 +33,6 @@ const fallbackSongs: KaraokeSong[] = fallbackSongTitles.map((title) => ({
   title,
   audio: `/karaoke/${title}.mp3`,
   lyrics: `/karaoke/${title}.lrc`,
-  chords: `/karaoke/${title}.chords`,
   stems: stemCandidatesFor(title),
 }))
 
@@ -44,12 +42,16 @@ function parseLrc(source: string): LyricLine[] {
 
   for (const rawLine of source.split(/\r?\n/)) {
     const matches = [...rawLine.matchAll(timestampPattern)]
-    const text = rawLine.replace(timestampPattern, '').trim()
+    let text = rawLine.replace(timestampPattern, '').trim()
       .replace(/^\uFEFF/, '')
       .replace(/\[(?:ar|ti|al|length|by|re|ve|offset):[^\]]*\]/gi, '')
-      .trim().replace(/^['“”](.*)['“”]$/, '$1')
+      .trim()
     if (!text) continue
-    const sectionText = text.match(/^\(([^)]+)\)$/) ?? text.match(/^\[([^\]]+)\]$/)
+    const quotedChordProLine = text.match(/^(\s*(?:\{[^}]+\}\s*)*)["“](.*)["”](\s*(?:\{[^}]+\}\s*)*)$/)
+    if (quotedChordProLine) text = `${quotedChordProLine[1]}${quotedChordProLine[2]}${quotedChordProLine[3]}`
+    else text = text.replace(/^["“”](.*)["“”]$/, '$1')
+    const { text: lyricText, segments } = parseChordProText(text)
+    const sectionText = lyricText.match(/^\(([^)]+)\)$/) ?? lyricText.match(/^\[([^\]]+)\]$/)
     const section = Boolean(sectionText && /^(?:intro|verse(?:\s+\d+)?|chorus(?:\s+\d+)?|pre-chorus|post-chorus|bridge|outro|interlude|instrumental|end)$/i.test(sectionText[1].trim()))
 
     for (const match of matches) {
@@ -57,8 +59,9 @@ function parseLrc(source: string): LyricLine[] {
       const milliseconds = Number(fraction.padEnd(3, '0').slice(0, 3))
       lines.push({
         time: Number(match[1]) * 60 + Number(match[2]) + milliseconds / 1000,
-        text,
+        text: lyricText,
         section,
+        segments,
       })
     }
   }
@@ -70,92 +73,29 @@ function isChordToken(token: string) {
   return /^[A-G](?:#|b)?(?:m|maj|min|dim|aug|sus\d*|add\d*|M|°|ø|\d)*(?:\/[A-G](?:#|b)?)?$/i.test(token)
 }
 
-function parseChordChart(source: string): ChordPhrase[] {
-  const phrases: ChordPhrase[] = []
-  let section = 'Song'
-  let pendingChords: string[] = []
-  const flush = () => {
-    if (pendingChords.length) phrases.push({ section, lyric: '', chords: pendingChords })
-    pendingChords = []
+function parseChordProText(source: string): { text: string; segments: LyricSegment[] } {
+  const segments: LyricSegment[] = []
+  const tokenPattern = /\{([^{}]+)\}/g
+  let cursor = 0
+  let pendingChord: string | undefined
+  let match: RegExpExecArray | null
+
+  while ((match = tokenPattern.exec(source))) {
+    const chord = match[1].trim()
+    if (!isChordToken(chord)) continue
+    const precedingText = source.slice(cursor, match.index)
+    if (pendingChord) segments.push({ chord: pendingChord, text: precedingText })
+    else if (precedingText) segments.push({ text: precedingText })
+    pendingChord = chord
+    cursor = match.index + match[0].length
   }
 
-  for (const rawLine of source.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line) continue
-    const sectionMatch = line.match(/^\[([^\]]+)\]$/) ?? line.match(/^\(([^)]+)\)$/)
-    if (sectionMatch) {
-      flush()
-      section = sectionMatch[1].trim()
-      continue
-    }
-    if (/^[eBGDAE]\|/i.test(line)) continue
-    const tokens = line.split(/\s+/)
-    if (tokens.every(isChordToken)) {
-      flush()
-      pendingChords = tokens
-    } else if (pendingChords.length) {
-      phrases.push({ section, lyric: line, chords: pendingChords })
-      pendingChords = []
-    }
-  }
-  flush()
-  return phrases
-}
+  const remainingText = source.slice(cursor)
+  if (pendingChord) segments.push({ chord: pendingChord, text: remainingText })
+  else if (remainingText) segments.push({ text: remainingText })
 
-function normalizeWords(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean)
-}
-
-function alignChords(phrases: ChordPhrase[], lines: LyricLine[]): ChordEvent[] {
-  const lyricLines = lines.filter((line) => !line.section)
-  const sectionLines = lines.filter((line) => line.section)
-  const matchedIndexes = new Set<number>()
-  const phraseTimes = phrases.map((phrase) => {
-    if (!phrase.lyric) return null
-    const phraseWords = normalizeWords(phrase.lyric)
-    let bestIndex = -1
-    let bestScore = 0
-    lyricLines.forEach((line, index) => {
-      if (matchedIndexes.has(index)) return
-      const words = new Set(normalizeWords(line.text))
-      const score = phraseWords.filter((word) => words.has(word)).length / Math.max(phraseWords.length, words.size)
-      if (score > bestScore) { bestScore = score; bestIndex = index }
-    })
-    if (bestIndex < 0 || bestScore < 0.35) return null
-    matchedIndexes.add(bestIndex)
-    return lyricLines[bestIndex].time
-  })
-
-  phraseTimes.forEach((time, index) => {
-    if (time !== null) return
-    const previous = phraseTimes.slice(0, index).map((value, phraseIndex) => ({ value, phraseIndex })).reverse().find((entry) => entry.value !== null)
-    const next = phraseTimes.slice(index + 1).map((value, offset) => ({ value, phraseIndex: index + offset + 1 })).find((entry) => entry.value !== null)
-    if (previous && next) {
-      phraseTimes[index] = previous.value! + (next.value! - previous.value!) * (index - previous.phraseIndex) / (next.phraseIndex - previous.phraseIndex)
-    } else if (next) {
-      phraseTimes[index] = next.value! * index / next.phraseIndex
-    } else if (previous) {
-      phraseTimes[index] = previous.value! + (index - previous.phraseIndex) * 2
-    } else {
-      const section = phrases[index].section.toLowerCase()
-      const marker = sectionLines.find((line) => normalizeWords(line.text.replace(/[()[\]]/g, '')).join(' ').startsWith(section))
-      phraseTimes[index] = marker?.time ?? 0
-    }
-  })
-
-  const events: ChordEvent[] = []
-  phrases.forEach((phrase, index) => {
-    const start = phraseTimes[index] ?? 0
-    const nextLine = lines.find((line) => line.time > start)
-    const end = Math.max(start + 0.4, Math.min(nextLine?.time ?? start + 4, start + 8))
-    phrase.chords.forEach((chord, chordIndex) => events.push({
-      time: start + (end - start) * chordIndex / Math.max(phrase.chords.length, 1),
-      chord,
-      section: phrase.section,
-      id: `${index}-${chordIndex}`,
-    }))
-  })
-  return events.sort((a, b) => a.time - b.time)
+  const text = segments.map((segment) => segment.text).join('')
+  return { text: text || source, segments: segments.some((segment) => segment.chord) ? segments : [{ text: source }] }
 }
 
 function estimateTempo(buffer: AudioBuffer) {
@@ -225,13 +165,11 @@ export default function KaraokePlayer() {
   const switchingMixRef = useRef(false)
   const lyricsWindowRef = useRef<HTMLDivElement>(null)
   const activeLineRef = useRef<HTMLButtonElement>(null)
-  const chordBarRef = useRef<HTMLDivElement>(null)
-  const activeChordRef = useRef<HTMLButtonElement>(null)
+  const coverTriggerRef = useRef<HTMLButtonElement>(null)
   const [karaokeSongs, setKaraokeSongs] = useState<KaraokeSong[]>(fallbackSongs)
   const [selectedSongId, setSelectedSongId] = useState(fallbackSongs[0].id)
   const selectedSong = karaokeSongs.find((song) => song.id === selectedSongId) ?? karaokeSongs[0]
   const [lrcText, setLrcText] = useState('')
-  const [chordText, setChordText] = useState('')
   const [tempo, setTempo] = useState<{ bpm: number; beatOffset: number } | null>(null)
   const [loadError, setLoadError] = useState('')
   const [currentTime, setCurrentTime] = useState(0)
@@ -242,6 +180,7 @@ export default function KaraokePlayer() {
   const [enabledStems, setEnabledStems] = useState<string[]>([])
   const [mixTime, setMixTime] = useState(0)
   const [lyricsReloadKey, setLyricsReloadKey] = useState(0)
+  const [isCoverOpen, setIsCoverOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -259,6 +198,23 @@ export default function KaraokePlayer() {
       .catch(() => { /* Use the built-in songs if the catalog endpoint is unavailable. */ })
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (!isCoverOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCoverOpen(false)
+        coverTriggerRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isCoverOpen])
 
   const isOriginalMix = Boolean(selectedSong.audio) && enabledStems.length === availableStems.length
   const getMixTime = () => {
@@ -287,6 +243,7 @@ export default function KaraokePlayer() {
   }
 
   const chooseSong = (songId: string) => {
+    setIsCoverOpen(false)
     stopStemSources(false)
     audioRef.current?.pause()
     setIsPlaying(false)
@@ -384,7 +341,6 @@ export default function KaraokePlayer() {
   useEffect(() => {
     const controller = new AbortController()
     setLrcText('')
-    setChordText('')
     setLoadError('')
     setCurrentTime(0)
     setDuration(0)
@@ -400,14 +356,8 @@ export default function KaraokePlayer() {
       .catch((error: Error) => {
         if (error.name !== 'AbortError') setLoadError(error.message)
       })
-    if (selectedSong.chords) {
-      fetch(`${selectedSong.chords}?refresh=${lyricsReloadKey}`, { signal: controller.signal, cache: 'no-store' })
-        .then((response) => response.ok ? response.text() : '')
-        .then(setChordText)
-        .catch((error: Error) => { if (error.name !== 'AbortError') setChordText('') })
-    }
     return () => controller.abort()
-  }, [selectedSong.lyrics, selectedSong.chords, lyricsReloadKey])
+  }, [selectedSong.lyrics, lyricsReloadKey])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -429,7 +379,6 @@ export default function KaraokePlayer() {
   }, [selectedSong.audio])
 
   const lines = useMemo(() => parseLrc(lrcText), [lrcText])
-  const chordEvents = useMemo(() => alignChords(parseChordChart(chordText), lines), [chordText, lines])
   const sections = useMemo(() => lines.filter((line) => line.section), [lines])
   const activeSectionIndex = useMemo(() => {
     if (playbackFinished) return -1
@@ -455,18 +404,6 @@ export default function KaraokePlayer() {
     }
     return found
   }, [currentTime, lines])
-  const activeChordIndex = useMemo(() => {
-    if (playbackFinished) return -1
-    let low = 0
-    let high = chordEvents.length - 1
-    let found = -1
-    while (low <= high) {
-      const middle = Math.floor((low + high) / 2)
-      if (chordEvents[middle].time <= currentTime) { found = middle; low = middle + 1 }
-      else high = middle - 1
-    }
-    return found
-  }, [chordEvents, currentTime, playbackFinished])
   const beatStepIndex = useMemo(() => {
     if (playbackFinished || !tempo || currentTime < tempo.beatOffset) return -1
     const beatLength = 60 / tempo.bpm
@@ -493,10 +430,6 @@ export default function KaraokePlayer() {
   useEffect(() => {
     if (lyricsWindowRef.current) lyricsWindowRef.current.scrollTop = 0
   }, [selectedSong.id])
-
-  useEffect(() => {
-    activeChordRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
-  }, [activeChordIndex])
 
   const togglePlayback = async () => {
     if (isOriginalMix) {
@@ -574,13 +507,13 @@ export default function KaraokePlayer() {
               <select aria-label="Choose a song" value={selectedSongId} onChange={(event) => chooseSong(event.target.value)}>
                 {karaokeSongs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
               </select>
-              <button className="karaoke-refresh" type="button" onClick={() => setLyricsReloadKey((key) => key + 1)} aria-label="Refresh lyrics and chords" title="Reload lyrics and chords from disk">
+              <button className="karaoke-refresh" type="button" onClick={() => setLyricsReloadKey((key) => key + 1)} aria-label="Refresh lyrics" title="Reload lyrics from disk">
                 <RefreshCw aria-hidden="true" />
               </button>
             </div>
           </div>
         </div>
-        <span className="karaoke-badge">LINE-SYNCED LYRICS</span>
+        <p className="karaoke-count">{karaokeSongs.length} {karaokeSongs.length === 1 ? 'song' : 'songs'}</p>
       </header>
 
       {availableStems.length > 0 && <fieldset className="karaoke-stems">
@@ -602,7 +535,7 @@ export default function KaraokePlayer() {
           <div className="karaoke-lyrics" aria-label="Timed lyrics" ref={lyricsWindowRef}>
             {lines.map((line, index) => (
               <button
-                className={`karaoke-line${index === activeIndex ? ' is-active' : ''}${index < activeIndex ? ' is-past' : ''}`}
+                className={`karaoke-line${line.section ? ' is-section' : ''}${line.segments?.some((segment) => segment.chord) ? ' has-chords' : ''}${index === activeIndex ? ' is-active' : ''}${index < activeIndex ? ' is-past' : ''}`}
                 key={`${line.time}-${index}`}
                 type="button"
                 onClick={() => playFromLyric(line.time)}
@@ -610,7 +543,10 @@ export default function KaraokePlayer() {
                 aria-current={index === activeIndex ? 'true' : undefined}
                 title={`Seek to ${formatTime(line.time)}`}
               >
-                {line.text}
+                {line.segments?.some((segment) => segment.chord) ? line.segments.map((segment, segmentIndex) => <Fragment key={segmentIndex}>
+                  {segment.chord && <span className="karaoke-inline-chord"><span>{segment.chord}</span></span>}
+                  {segment.text}
+                </Fragment>) : line.section ? line.text.replace(/^[([]|[)\]]$/g, '') : line.text}
               </button>
             ))}
             <div className="karaoke-lyric-tail" aria-hidden="true" />
@@ -631,20 +567,6 @@ export default function KaraokePlayer() {
         </div>
       </fieldset>}
 
-      {chordEvents.length > 0 && <fieldset className="karaoke-chords" aria-label="Chord bar">
-        <legend>Chord bar</legend>
-        <div className="karaoke-chord-track" ref={chordBarRef}>
-          {chordEvents.map((event, index) => <button
-            key={event.id}
-            type="button"
-            className={`karaoke-chord${index === activeChordIndex ? ' is-active' : activeChordIndex >= 0 && Math.abs(index - activeChordIndex) === 1 ? ' is-nearby' : ''}`}
-            ref={index === activeChordIndex ? activeChordRef : undefined}
-            onClick={() => playFromLyric(event.time)}
-            title={`${event.section} · ${formatTime(event.time)}`}
-          >{event.chord}</button>)}
-        </div>
-      </fieldset>}
-
       {tempo && <fieldset className="karaoke-beats" aria-label={`Beat bar, estimated ${tempo.bpm} beats per minute`}>
         <legend>Beat bar <span>Estimated {tempo.bpm} BPM</span></legend>
         <div className="karaoke-beat-track">
@@ -656,7 +578,14 @@ export default function KaraokePlayer() {
         </div>
       </fieldset>}
 
-      <div className="karaoke-controls">
+      <div className={`karaoke-controls${selectedSong.image ? ' has-cover' : ''}`}>
+        {selectedSong.image && <button
+          ref={coverTriggerRef}
+          className="karaoke-cover-trigger"
+          type="button"
+          onClick={() => setIsCoverOpen(true)}
+          aria-label={`Enlarge ${selectedSong.title} cover`}
+        ><img className="karaoke-cover" src={selectedSong.image} alt="" /></button>}
         <div className="karaoke-transport">
           <button type="button" className="karaoke-skip" onClick={() => seekBy(-5)} aria-label="Back 5 seconds"><RotateCcw /><span>5</span></button>
           <button type="button" className="karaoke-play" onClick={togglePlayback} aria-label={isPlaying ? 'Pause' : 'Play'}>
@@ -690,6 +619,15 @@ export default function KaraokePlayer() {
         onEnded={() => { setIsPlaying(false); setPlaybackFinished(true) }}
         onError={() => setLoadError('Could not load the karaoke MP3.')}
       />
+
+      {isCoverOpen && selectedSong.image && <div className="karaoke-cover-backdrop" onClick={() => { setIsCoverOpen(false); coverTriggerRef.current?.focus() }}>
+        <div className="karaoke-cover-dialog" role="dialog" aria-modal="true" aria-label={`${selectedSong.title} cover art`} onClick={(event) => event.stopPropagation()}>
+          <button className="karaoke-cover-close" type="button" onClick={() => { setIsCoverOpen(false); coverTriggerRef.current?.focus() }} aria-label="Close cover image">
+            <X aria-hidden="true" />
+          </button>
+          <img src={selectedSong.image} alt={`${selectedSong.title} cover`} />
+        </div>
+      </div>}
     </section>
   )
 }

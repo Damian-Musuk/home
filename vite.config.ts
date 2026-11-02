@@ -15,19 +15,21 @@ async function discoverKaraokeSongs() {
     .map((lyricsFile) => {
       const title = lyricsFile.slice(0, -4)
       const matchingAudio = byLowercaseName.get(`${title}.mp3`.toLowerCase())
+      const matchingImage = ['.jpg', '.png']
+        .map((extension) => byLowercaseName.get(`${title}${extension}`.toLowerCase()))
+        .find((file) => file !== undefined)
       const hasStemAudio = files.some((file) => {
         const lowerFile = file.toLowerCase()
         return lowerFile.startsWith(`${title}_`.toLowerCase()) && stemName.test(file)
       })
       if (!matchingAudio && !hasStemAudio) return null
 
-      const chordFile = byLowercaseName.get(`${title}.chords`.toLowerCase())
       return {
         id: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         title,
         audio: matchingAudio ? `/karaoke/${encodeURIComponent(matchingAudio)}` : '',
         lyrics: `/karaoke/${encodeURIComponent(lyricsFile)}`,
-        chords: chordFile ? `/karaoke/${encodeURIComponent(chordFile)}` : '',
+        image: matchingImage ? `/karaoke/${encodeURIComponent(matchingImage)}` : undefined,
       }
     })
     .filter((song) => song !== null)
