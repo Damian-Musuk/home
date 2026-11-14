@@ -1,74 +1,36 @@
-import { readdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
-const karaokeDirectory = resolve(__dirname, 'public/karaoke')
-
-async function discoverKaraokeSongs() {
-  const files = await readdir(karaokeDirectory)
-  const byLowercaseName = new Map(files.map((file) => [file.toLowerCase(), file]))
-  const stemName = /_(?:vocal|vocals|backing_vocals|drums|bass|guitar|keyboard|background)\.(?:ogg|mp3)$/i
-  const lyricFiles = files.filter((file) => file.toLowerCase().endsWith('.lrc'))
-
-  return lyricFiles
-    .map((lyricsFile) => {
-      const title = lyricsFile.slice(0, -4)
-      const matchingAudio = byLowercaseName.get(`${title}.mp3`.toLowerCase())
-      const matchingImage = ['.jpg', '.png']
-        .map((extension) => byLowercaseName.get(`${title}${extension}`.toLowerCase()))
-        .find((file) => file !== undefined)
-      const hasStemAudio = files.some((file) => {
-        const lowerFile = file.toLowerCase()
-        return lowerFile.startsWith(`${title}_`.toLowerCase()) && stemName.test(file)
-      })
-      if (!matchingAudio && !hasStemAudio) return null
-
-      return {
-        id: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-        title,
-        audio: matchingAudio ? `/karaoke/${encodeURIComponent(matchingAudio)}` : '',
-        lyrics: `/karaoke/${encodeURIComponent(lyricsFile)}`,
-        image: matchingImage ? `/karaoke/${encodeURIComponent(matchingImage)}` : undefined,
-      }
-    })
-    .filter((song) => song !== null)
-    .sort((left, right) => left.title.localeCompare(right.title))
-}
-
-function karaokeCatalogPlugin(): Plugin {
-  let isProductionBuild = false
+/** Writes dist/sw.js with the list of files the app needs to open with no signal. */
+function offlineShell(): Plugin {
+  let outDir = 'dist'
   return {
-    name: 'karaoke-song-catalog',
-    configResolved(config) {
-      isProductionBuild = config.command === 'build'
-    },
-    configureServer(server) {
-      server.middlewares.use('/karaoke/songs.json', async (request, response, next) => {
-        if (request.method !== 'GET') return next()
-        try {
-          response.setHeader('Content-Type', 'application/json; charset=utf-8')
-          response.setHeader('Cache-Control', 'no-store')
-          response.end(JSON.stringify(await discoverKaraokeSongs()))
-        } catch (error) {
-          next(error instanceof Error ? error : new Error('Could not scan the karaoke folder.'))
-        }
-      })
-    },
-    async buildStart() {
-      if (!isProductionBuild) return
-      this.emitFile({
-        type: 'asset',
-        fileName: 'karaoke/songs.json',
-        source: JSON.stringify(await discoverKaraokeSongs()),
-      })
+    name: 'musuk-offline-shell',
+    apply: 'build',
+    configResolved(config) { outDir = resolve(config.root, config.build.outDir) },
+    closeBundle() {
+      const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)])
+      const files = walk(outDir)
+        .map((path) => path.slice(outDir.length).replaceAll('\\', '/'))
+        .filter((path) => path !== '/sw.js' && path !== '/_redirects' && !path.endsWith('.DS_Store') && !path.includes('icon-source'))
+        .sort()
+      const hash = createHash('sha256')
+      for (const path of files) hash.update(path).update(readFileSync(join(outDir, path)))
+      const urls = files.map((path) => (path === '/index.html' ? '/' : path))
+      const source = readFileSync(resolve(__dirname, 'src/sw.js'), 'utf8')
+        .replace('__SHELL_VERSION__', hash.digest('hex').slice(0, 12))
+        .replace('__SHELL_FILES__', JSON.stringify(urls))
+      writeFileSync(join(outDir, 'sw.js'), source)
     },
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), karaokeCatalogPlugin()],
+  plugins: [react(), offlineShell()],
   resolve: {
     alias: {
       react: resolve(__dirname, 'node_modules/react'),

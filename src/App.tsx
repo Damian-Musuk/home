@@ -1,239 +1,87 @@
-import { useEffect, useState } from 'react'
-import { BookOpen, CircleDot, Drum, Guitar, Headphones, LayoutGrid, List, Mic2, Piano, Shuffle, Sparkles } from 'lucide-react'
-import './App.css'
-import Tabs from './components/Tabs'
-import Chart from './components/Chart'
-import CoF from './components/CoF'
-import Chord from './components/Chord'
-import Footer from './components/Footer'
-import Modes from './components/Modes'
-import Progressions from './components/Progressions'
-import SongCard from './components/SongCard'
-import SongPlayer from './components/SongPlayer'
-import KaraokePlayer from './components/KaraokePlayer'
-import type { Song } from './data/songs'
-import { songs } from './data/songs'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router'
+import { CircleDot, ExternalLink, Guitar, ListMusic, Sparkles, type LucideIcon } from 'lucide-react'
+import ChordChart from './tools/ChordChart'
+import Progressions from './tools/Progressions'
 
-const sectionOrder = ['listen', 'learn', 'play', 'sing', 'perform'] as const
-const learnTabOrder = ['chords', 'circle-of-fifths', 'modes', 'progressions'] as const
+// Anything that draws a stave pulls in the music-engraving library, so load those parts on first use.
+const CircleOfFifths = lazy(() => import('./tools/CircleOfFifths'))
+const Modes = lazy(() => import('./tools/Modes'))
+const ChordPanel = lazy(() => import('./chord/ChordPanel'))
 
-type SectionId = (typeof sectionOrder)[number]
-type LearnTabId = (typeof learnTabOrder)[number]
+const SONGS_URL = 'https://songs.damian-mus.uk/'
 
-const resolveInitialSection = (): SectionId => {
-  if (typeof window === 'undefined') return 'listen'
-
-  const path = window.location.pathname.replace(/\/+$/, '') || '/'
-  const match = path.split('/').filter(Boolean)[0]
-
-  return sectionOrder.includes(match as SectionId) ? (match as SectionId) : 'listen'
-}
+const tools: Array<{ path: string; label: string; short: string; icon: LucideIcon }> = [
+  { path: '/', label: 'Chords', short: 'Chords', icon: Guitar },
+  { path: '/circle-of-fifths', label: 'Circle of Fifths', short: 'Circle', icon: CircleDot },
+  { path: '/modes', label: 'Modes', short: 'Modes', icon: Sparkles },
+  { path: '/progressions', label: 'Progressions', short: 'Progressions', icon: ListMusic },
+]
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<SectionId>(resolveInitialSection)
-  const [activeLearnTab, setActiveLearnTab] = useState<LearnTabId>('chords')
-  const [selectedSong, setSelectedSong] = useState<Song | null>(null)
-  const [selectedChord, setSelectedChord] = useState<string | null>(null)
-  const [queue, setQueue] = useState<Song[]>(songs)
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const { pathname } = useLocation()
+  // The open chord belongs to the page it was tapped on, so it closes when you move to another tool.
+  const [selected, setSelected] = useState<{ chord: string; path: string } | null>(null)
+  const chord = selected?.path === pathname ? selected.chord : null
+  const selectChord = (name: string) => setSelected({ chord: name, path: pathname })
 
   useEffect(() => {
-    const syncFromHistory = () => {
-      const nextSection = resolveInitialSection()
-      setActiveSection(nextSection)
-    }
-
-    window.addEventListener('popstate', syncFromHistory)
-    return () => window.removeEventListener('popstate', syncFromHistory)
-  }, [])
-
-  useEffect(() => {
-    const nextPath = `/${activeSection}`
-    if (window.location.pathname !== nextPath) {
-      window.history.pushState({ section: activeSection }, '', nextPath)
-    }
-  }, [activeSection])
-
-  const shuffleUpcoming = () => {
-    const currentIndex = selectedSong
-      ? queue.findIndex((song) => song.id === selectedSong.id)
-      : -1
-    const played = queue.slice(0, currentIndex + 1)
-    const upcoming = queue.slice(currentIndex + 1)
-
-    for (let index = upcoming.length - 1; index > 0; index -= 1) {
-      const randomIndex = Math.floor(Math.random() * (index + 1))
-        ;[upcoming[index], upcoming[randomIndex]] = [upcoming[randomIndex], upcoming[index]]
-    }
-
-    setQueue([...played, ...upcoming])
-  }
-
-  const playNext = () => {
-    if (!selectedSong) return
-    const currentIndex = queue.findIndex((song) => song.id === selectedSong.id)
-    setSelectedSong(queue[currentIndex + 1] ?? null)
-  }
-
-  const mainSections = [
-    { id: 'listen', icon: Headphones, label: 'Listen' },
-    { id: 'learn', icon: BookOpen, label: 'Learn' },
-    { id: 'play', icon: Guitar, label: 'Play' },
-    { id: 'sing', icon: Mic2, label: 'Sing' },
-    { id: 'perform', icon: Drum, label: 'Perform' },
-  ] as const
-
-  const learnTabs = [
-    { id: 'chords', label: 'Chords', icon: Guitar },
-    { id: 'circle-of-fifths', label: 'Circle of Fifths', icon: CircleDot },
-    { id: 'modes', label: 'Modes', icon: Sparkles },
-    { id: 'progressions', label: 'Progressions', icon: Piano },
-  ] as const
-
-  const renderLearnPanel = () => {
-    if (activeLearnTab === 'circle-of-fifths') return <CoF onChordSelect={setSelectedChord} />
-    if (activeLearnTab === 'modes') return <Modes onChordSelect={setSelectedChord} />
-    if (activeLearnTab === 'progressions') return <Progressions onChordSelect={setSelectedChord} />
-
-    return <Chart onChordSelect={setSelectedChord} />
-  }
-
-  const renderSectionContent = () => {
-    if (activeSection === 'learn') {
-      return (
-        <section className="music-container" aria-labelledby="learn-heading">
-          <div className="music-heading">
-            <div>
-              <p className="music-eyebrow">LEARN</p>
-              <h2 id="learn-heading">Music theory</h2>
-            </div>
-          </div>
-
-          <nav className="learn-subnav" aria-label="Learn topics">
-            {learnTabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                className={`learn-tab ${activeLearnTab === id ? 'is-active' : ''}`}
-                onClick={() => setActiveLearnTab(id)}
-                aria-pressed={activeLearnTab === id}
-              >
-                <Icon className="learn-tab-icon" aria-hidden="true" /> <span>{label}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="learn-panel">{renderLearnPanel()}</div>
-        </section>
-      )
-    }
-
-    if (activeSection === 'play') {
-      return <Tabs onChordSelect={setSelectedChord} />
-    }
-
-    if (activeSection === 'sing') {
-      return (
-        <section className="music-container placeholder-section" aria-labelledby="sing-heading">
-          <div className="placeholder-card">
-            <p className="music-eyebrow">SING</p>
-            <h2 id="sing-heading">MUSUK Sing</h2>
-            <p>Pitch, tuning and vocal training coming soon.</p>
-          </div>
-        </section>
-      )
-    }
-
-    if (activeSection === 'perform') {
-      return <KaraokePlayer />
-    }
-
-    return (
-      <section className="music-container" aria-labelledby="music-heading">
-        <div className="music-heading">
-          <div className="music-heading-copy">
-            <p className="music-eyebrow">LISTEN</p>
-            <h2 id="music-heading">MUSUK Songs</h2>
-          </div>
-
-          <div className="music-buttons">
-            <button
-              type="button"
-              className={`list-view${viewMode === 'list' ? ' is-active' : ''}`}
-              onClick={() => setViewMode('list')}
-              aria-label="List view"
-              aria-pressed={viewMode === 'list'}
-              title="List view"
-            >
-              <List aria-hidden="true" />
-            </button>
-
-            <button
-              type="button"
-              className={`icon-view${viewMode === 'grid' ? ' is-active' : ''}`}
-              onClick={() => setViewMode('grid')}
-              aria-label="Icon view"
-              aria-pressed={viewMode === 'grid'}
-              title="Icon view"
-            >
-              <LayoutGrid aria-hidden="true" />
-            </button>
-
-            <button type="button" className="shuffle-button" onClick={shuffleUpcoming} aria-label="Shuffle upcoming songs" title="Shuffle upcoming songs">
-              <Shuffle aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-
-        <div className={`song-list${viewMode === 'grid' ? ' icon-song-grid' : ''}`}>
-          {queue.map((song, index) => (
-            <SongCard
-              key={song.id}
-              song={song}
-              position={index + 1}
-              isPlaying={selectedSong?.id === song.id}
-              onSelect={setSelectedSong}
-            />
-          ))}
-        </div>
-      </section>
-    )
-  }
+    const tool = tools.find((entry) => entry.path === pathname)
+    document.title = tool && tool.path !== '/' ? `${tool.label} · Musuk` : 'Musuk · Music theory for guitar and piano'
+  }, [pathname])
 
   return (
-    <>
-      <main id="top">{renderSectionContent()}</main>
+    <div className={`app${chord ? ' has-chord' : ''}`}>
+      <header className="app-header">
+        <NavLink to="/" className="brand" aria-label="Musuk home">
+          <img src="/favicon.svg" alt="" />
+          <span>
+            <strong>Musuk</strong>
+            <small>Music theory for guitar and piano</small>
+          </span>
+        </NavLink>
+        <nav className="tool-nav" aria-label="Theory tools">
+          {tools.map(({ path, label, short, icon: Icon }) => (
+            <NavLink key={path} to={path} end className={({ isActive }) => `tool-link${isActive ? ' is-active' : ''}`}>
+              <Icon aria-hidden="true" />
+              <span className="tool-label-long">{label}</span>
+              <span className="tool-label-short">{short}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <a className="songs-link" href={SONGS_URL}>
+          Songs <ExternalLink aria-hidden="true" />
+        </a>
+      </header>
 
-      {selectedChord && (
-        <aside className="selected-chord" aria-label={`Selected chord: ${selectedChord}`}>
-          <Chord chord={selectedChord} onClose={() => setSelectedChord(null)} />
+      <main>
+        <Suspense fallback={null}>
+        <Routes>
+          <Route path="/" element={<ChordChart onChordSelect={selectChord} />} />
+          <Route path="/circle-of-fifths" element={<CircleOfFifths onChordSelect={selectChord} />} />
+          <Route path="/modes" element={<Modes onChordSelect={selectChord} />} />
+          <Route path="/progressions" element={<Progressions onChordSelect={selectChord} />} />
+          {/* Old addresses: the song sections moved to the Songs site. */}
+          {['/listen', '/play', '/perform'].map((path) => (
+            <Route key={path} path={path} element={<LeaveTo url={SONGS_URL} />} />
+          ))}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        </Suspense>
+      </main>
+
+      {chord && (
+        <aside className="selected-chord" aria-label={`Chord: ${chord}`}>
+          <Suspense fallback={null}>
+            <ChordPanel chord={chord} onClose={() => setSelected(null)} />
+          </Suspense>
         </aside>
       )}
-
-      <Footer />
-
-      <nav className="fixed-tab-bar" aria-label="MUSUK sections">
-        {mainSections.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            className={`fixed-tab ${activeSection === id ? 'is-active' : ''}`}
-            type="button"
-            onClick={() => setActiveSection(id)}
-          >
-            <Icon className="fixed-tab-icon" aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {selectedSong && activeSection === 'listen' && (
-        <SongPlayer
-          key={selectedSong.id}
-          song={selectedSong}
-          onEnded={playNext}
-          onClose={() => setSelectedSong(null)}
-        />
-      )}
-    </>
+    </div>
   )
+}
+
+function LeaveTo({ url }: { url: string }) {
+  useEffect(() => { window.location.replace(url) }, [url])
+  return <p className="leaving">Taking you to <a href={url}>Songs</a>…</p>
 }

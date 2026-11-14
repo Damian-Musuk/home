@@ -1,0 +1,233 @@
+/* Shared by the four theory tools: headings, the note picker, chord buttons and the scale-degree grid. */
+
+.tool { text-align: center; }
+
+.tool-heading { margin-bottom: 16px; }
+
+.tool-heading h2 {
+  font-size: clamp(1.4rem, 4vw, 1.8rem);
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Note picker ---------- */
+
+.note-picker {
+  display: grid;
+  gap: 5px;
+  max-width: 500px;
+  margin: 0 auto 16px;
+}
+
+.note-row {
+  display: flex;
+  gap: 5px;
+}
+
+.note-row.is-black { padding: 0 calc(100% / 14); }
+.note-row > * { flex: 1; min-width: 0; }
+
+.black-note,
+.white-note {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.black-note {
+  height: 48px;
+  color: var(--text);
+  background: #05070a;
+  font-size: 0.86rem;
+  line-height: 1.15;
+}
+
+.black-note span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.white-note {
+  height: 46px;
+  color: var(--ink);
+  background: var(--text);
+  font-size: 1.2rem;
+}
+
+.black-note:hover,
+.white-note:hover { border-color: var(--teal); }
+
+.selected-note,
+.selected-note span {
+  border-color: var(--teal);
+  color: var(--ink);
+  background: var(--teal);
+}
+
+/* ---------- Chord buttons ---------- */
+
+.chord-type,
+.modeChord,
+.degree-grid button,
+.substitution button,
+.prog-chord-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--teal-line);
+  border-radius: 10px;
+  color: var(--teal);
+  background: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.chord-type:hover,
+.modeChord:hover,
+.substitution button:hover,
+.prog-chord-button:hover { background: var(--teal-dim); }
+
+.chord-type.selected {
+  border-color: var(--teal);
+  color: var(--ink);
+  background: var(--teal);
+}
+
+.chord-types {
+  display: grid;
+  gap: 10px;
+}
+
+.chord-group {
+  min-width: 0;
+  margin: 0;
+  padding: 4px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.chord-group-title,
+.substitution legend {
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chord-group-buttons,
+.borrowed-chords,
+.mode-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mode-list { margin-bottom: 16px; }
+.borrowed-group { margin-top: 10px; }
+
+/* ---------- Scale-degree grid (circle of fifths and modes) ---------- */
+
+.degree-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.degree-grid > div {
+  min-width: 0;
+  padding: 6px 4px 9px;
+  border-radius: 10px;
+}
+
+.degree-grid > div > span:first-child {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tonic, .subdominant, .dominant, .supertonic, .submediant, .mediant, .subtonic { color: #fff; }
+.tonic { background: var(--deg-tonic); }
+.subdominant { background: var(--deg-subdominant); }
+.dominant { background: var(--deg-dominant); }
+.supertonic { background: var(--deg-supertonic); }
+.submediant { background: var(--deg-submediant); }
+.mediant { background: var(--deg-mediant); }
+.subtonic { background: var(--deg-subtonic); }
+
+.degree-grid .tonic,
+.degree-grid .subdominant,
+.degree-grid .dominant,
+.degree-grid .supertonic,
+.degree-grid .submediant,
+.degree-grid .mediant,
+.degree-grid .subtonic { align-self: start; }
+
+.degree-grid [class] > button {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.degree-grid [class] > button:hover { background: rgba(0, 0, 0, 0.5); }
+
+.cof-roman {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.keySig {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.keySig b { color: var(--text); }
+
+.stave {
+  height: 96px;
+  overflow: hidden;
+}
+
+.modeTitle {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.seventh-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.seventh-tick input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--teal);
+}
+
+/* ---------- Stave (key signatures here, chord notes in the chord panel) ---------- */
+
+.stave-container { width: 100px; }
+
+.stave-container svg * {
+  fill: var(--text);
+  stroke: var(--muted);
+}

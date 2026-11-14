@@ -3,6 +3,8 @@
   "name": "home",
   "compatibility_date": "2026-09-04",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    // Every address is the same single-page app, so reloading /modes works.
+    "not_found_handling": "single-page-application"
   }
 }

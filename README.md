@@ -1,90 +1,46 @@
-# Damian Music
+# Musuk (Home)
 
-Home for Damian's music app, built with React, TypeScript, and Vite.
+A small web app for learning music theory on guitar and piano, at https://damian-mus.uk.
+Tap any chord to see it as guitar shapes, on a piano keyboard, or on a stave.
 
-- Repository: https://github.com/roleyboard/home
-- Live app: https://musaic.damian-mus.uk/
+Songs (listening, chord sheets, karaoke) live in a separate app: https://songs.damian-mus.uk
+(repo: https://github.com/Damian-Musuk/songs).
 
-## Cloudflare Workers
+## The four tools
 
-This repository deploys to the existing Cloudflare Worker service named `home`:
+| Address | Tool |
+| --- | --- |
+| `/` | Chord chart: every chord type for a chosen root note |
+| `/circle-of-fifths` | Circle of fifths with the chords of each key, tritone substitution and secondary dominants |
+| `/modes` | The seven modes: their chords, key signature and borrowed chords |
+| `/progressions` | Common chord progressions in any key |
 
-- Build command: `npm run build`
-- Deploy command: `npm run deploy`
+Old addresses `/listen`, `/play` and `/perform` send visitors to the Songs site (`public/_redirects`, and in `src/App.tsx` for installed copies).
 
-The Worker configuration in `wrangler.jsonc` serves the Vite build from `dist`. In Cloudflare's Git deployment settings, connect `https://github.com/roleyboard/home`, use the `main` branch, and run `npm run deploy`.
+## Run it
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+npm run dev        # development
+npm run build      # production build into dist/
+npm run preview    # serve the production build
+npm run lint
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Where things live
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Path | What |
+| --- | --- |
+| `src/App.tsx` | Header, navigation, the four routes and the chord panel |
+| `src/styles/theme.css` | Colours and other design tokens, base styles, app shell |
+| `src/tools/` | The four tools, the shared `NotePicker`, and their styles (`tools.css` is shared) |
+| `src/chord/` | The chord panel: `ChordPanel` (works out a chord's notes), `GuitarShapes`, `PianoKeys`, `Stave`, `Inversions`, `ChordViewSwitch`, and `guitar-chords.json` |
+| `src/sw.js` | Service worker template; the build fills in the file list so the app opens with no signal |
+| `public/media/` | Piano note samples |
+| `public/icons/`, `public/favicon.svg` | The teal plectrum icon |
+| `sites/` | Unrelated, separately hosted projects kept here for reference; not part of this app |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Deploying
 
-```
-# damian-music
+Cloudflare builds and deploys the `home` Worker when `main` is pushed to
+https://github.com/Damian-Musuk/home. `wrangler.jsonc` serves `dist/` as a single-page app.

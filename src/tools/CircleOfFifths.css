@@ -1,0 +1,62 @@
+.circle-svg {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  margin: -14px auto -6px;
+  font-weight: 700;
+}
+
+.major-ring,
+.minor-ring {
+  transform-origin: 380px 380px;
+  transition: transform 1.6s ease-in-out;
+}
+
+.major-ring g:hover circle,
+.minor-ring g:hover circle { filter: brightness(1.35); }
+
+.diminished-display circle { transition: fill 0.4s ease; }
+.diminished-display text { pointer-events: none; }
+
+.glow { animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+  0%, 98% { filter: drop-shadow(0 0 6px #fff); }
+  49% { filter: drop-shadow(0 0 20px var(--teal)); }
+}
+
+.secondary-dominants {
+  padding: 4px;
+  font-size: 0.84rem;
+}
+
+.secondary-dominants .SD-Label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.secondary-dominants ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--serif);
+}
+
+.substitution { margin-top: 12px; }
+
+.substitution fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.substitution button { margin: 6px 8px; }
+.substitution .cof-roman { margin: 0 8px; }

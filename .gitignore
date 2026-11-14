@@ -1,4 +1,8 @@
 node_modules/
+dist/
+.wrangler/
+.DS_Store
+*.tsbuildinfo
 # Separately hosted ChatGPT site projects; do not clone these as submodules here.
 /sites/care-reference/
 /sites/cyberplay/

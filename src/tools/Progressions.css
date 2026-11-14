@@ -1,0 +1,64 @@
+.progression-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+
+.progression-header select {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.progression-list {
+  display: grid;
+  gap: 6px;
+}
+
+.progression-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+}
+
+.progression-row:hover { border-color: var(--teal-line); }
+
+.progression-row.selected {
+  border-color: var(--teal-line);
+  background: var(--teal-dim);
+}
+
+.prog-roman {
+  font-family: var(--serif);
+  font-weight: 700;
+}
+
+.prog-chords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.prog-chord-button {
+  min-width: 38px;
+  padding: 0 6px;
+}
+
+.progression-info {
+  grid-column: 1 / -1;
+  color: var(--teal);
+  font-size: 0.84rem;
+}

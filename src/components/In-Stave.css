@@ -1,9 +1,0 @@
-.stave-container {
-  z-index: -100;
-  width: 100px;
-}
-
-.stave-container svg * {
-  fill: black;
-  stroke: grey;
-}
